@@ -16,3 +16,4 @@ C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\obj\Release\net8.0-windows\refint\MiMoT
 C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\obj\Release\net8.0-windows\MiMoTTS.pdb
 C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\obj\Release\net8.0-windows\MiMoTTS.genruntimeconfig.cache
 C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\obj\Release\net8.0-windows\ref\MiMoTTS.dll
+C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\obj\Release\net8.0-windows\MiMoTTS.sourcelink.json
