@@ -1,6 +1,0 @@
-C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\bin\Release\net8.0-windows\publish\manifest.yml
-C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\bin\Release\net8.0-windows\publish\README.md
-C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\bin\Release\net8.0-windows\publish\MiMoTTS.dll
-C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\bin\Release\net8.0-windows\publish\MiMoTTS.deps.json
-C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\bin\Release\net8.0-windows\publish\MiMoTTS.runtimeconfig.json
-C:\Users\lladl\Documents\MiMoTTS\MiMoTTS\bin\Release\net8.0-windows\publish\MiMoTTS.pdb
