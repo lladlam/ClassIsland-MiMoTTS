@@ -1,0 +1,74 @@
+<ci:SpeechProviderControlBase x:Class="MiMoTTS.Controls.SpeechProviderSettingsControls.MiMoSpeechServiceSettingsControl"
+                              xmlns="https://github.com/avaloniaui"
+                              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                              xmlns:local="clr-namespace:MiMoTTS.Controls.SpeechProviderSettingsControls"
+                              xmlns:ci="http://classisland.tech/schemas/xaml/core"
+                              xmlns:controls="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+                              mc:Ignorable="d"
+                              d:DesignHeight="450"
+                              d:DesignWidth="800">
+    <StackPanel DataContext="{Binding}" Spacing="1">
+        <controls:SettingsExpanderItem Content="API 地址" Description="默认：https://api.xiaomimimo.com/v1">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="280" Text="{Binding Settings.ApiBaseUrl, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="API Key">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="280"
+                         PasswordChar="*"
+                         Text="{Binding Settings.ApiKey, Mode=TwoWay}"
+                         TextChanged="PasswordChangedHandler"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="模型">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="180" Text="{Binding Settings.Model, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="音色" Description="例如：mimo_default / default_zh / default_en">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="180" Text="{Binding Settings.Voice, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="音频格式">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="120" Text="{Binding Settings.AudioFormat, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="风格标签" Description="填写后会自动添加到文本开头，例如：开心 或 东北话">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="220" Text="{Binding Settings.Style, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="语速" Description="可填写：默认 / 变快 / 变慢（会与风格标签一起注入 &lt;style&gt;）">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="150" Text="{Binding Settings.SpeedStyle, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="启用用户提示词">
+            <controls:SettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding Settings.EnableUserPrompt, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="用户提示词" Description="作为 user 角色消息发送，用于影响语气风格。">
+            <controls:SettingsExpanderItem.Footer>
+                <TextBox Width="360"
+                         Height="72"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         Text="{Binding Settings.UserPrompt, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+    </StackPanel>
+</ci:SpeechProviderControlBase>
