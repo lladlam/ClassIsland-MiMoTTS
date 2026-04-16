@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MiMoTTS")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+86ec7badae3292b1e778eb0ed039c9cd50118d94")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ab8aedc3230ceb31a0462a21de162856699d8bf6")]
 [assembly: System.Reflection.AssemblyProductAttribute("MiMoTTS")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MiMoTTS")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
