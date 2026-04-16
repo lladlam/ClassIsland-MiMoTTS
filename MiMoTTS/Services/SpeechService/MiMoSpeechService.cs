@@ -284,82 +284,120 @@ public class MiMoSpeechService : ISpeechService
         }
 
         IsPlaying = true;
-        while (PlayingQueue.Count > 0)
+        try
         {
-            var playInfo = CurrentPlayInfo = PlayingQueue.Dequeue();
-            if (playInfo.CancellationTokenSource.IsCancellationRequested)
+            while (PlayingQueue.Count > 0)
             {
-                continue;
-            }
-
-            if (playInfo.DownloadTask != null)
-            {
-                _logger.LogDebug("等待语音生成完成...");
-                var result = await playInfo.DownloadTask;
-                if (!result)
+                var playInfo = CurrentPlayInfo = PlayingQueue.Dequeue();
+                if (playInfo.CancellationTokenSource.IsCancellationRequested)
                 {
-                    _logger.LogError("语音 {FilePath} 生成失败。", playInfo.FilePath);
                     continue;
                 }
 
-                _logger.LogDebug("语音生成完成。");
-            }
-
-            if (!File.Exists(playInfo.FilePath))
-            {
-                _logger.LogError("语音文件不存在：{FilePath}", playInfo.FilePath);
-                continue;
-            }
-
-            try
-            {
-                _logger.LogDebug("开始播放 {FilePath}", playInfo.FilePath);
-
-                CurrentSoundPlayer?.Stop();
-                CurrentSoundPlayer?.Dispose();
-
-                using var device = _audioService.TryInitializeDefaultPlaybackDevice();
-                device?.Start();
-
-                await using var stream = File.OpenRead(playInfo.FilePath);
-                var provider = new StreamDataProvider(_audioEngine, IAudioService.DefaultAudioFormat, stream);
-                var player = new SoundPlayer(_audioEngine, IAudioService.DefaultAudioFormat, provider)
+                if (playInfo.DownloadTask != null)
                 {
-                    Volume = (float)ISpeechService.GlobalSettings.SpeechVolume
-                };
+                    _logger.LogDebug("等待语音生成完成...");
+                    var result = await playInfo.DownloadTask;
+                    if (!result)
+                    {
+                        _logger.LogError("语音 {FilePath} 生成失败。", playInfo.FilePath);
+                        continue;
+                    }
 
-                CurrentSoundPlayer = player;
-                device?.MasterMixer.AddComponent(player);
-
-                var playbackTcs = new TaskCompletionSource<bool>();
-
-                void PlaybackStoppedHandler(object? sender, EventArgs args)
-                {
-                    playbackTcs.TrySetResult(true);
+                    _logger.LogDebug("语音生成完成。");
                 }
 
-                player.PlaybackEnded += PlaybackStoppedHandler;
-                player.Play();
+                if (!File.Exists(playInfo.FilePath))
+                {
+                    _logger.LogError("语音文件不存在：{FilePath}", playInfo.FilePath);
+                    continue;
+                }
 
-                await playbackTcs.Task;
+                try
+                {
+                    _logger.LogDebug("开始播放 {FilePath}", playInfo.FilePath);
 
-                player.PlaybackEnded -= PlaybackStoppedHandler;
-                player.Dispose();
-                _logger.LogDebug("结束播放 {FilePath}", playInfo.FilePath);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("语音播放已取消：{FilePath}", playInfo.FilePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "无法播放语音。");
+                    using var device = _audioService.TryInitializeDefaultPlaybackDevice();
+                    if (device == null)
+                    {
+                        _logger.LogError("初始化音频设备失败，无法播放语音：{FilePath}", playInfo.FilePath);
+                        continue;
+                    }
+
+                    await using var stream = File.OpenRead(playInfo.FilePath);
+                    var provider = new StreamDataProvider(_audioEngine, IAudioService.DefaultAudioFormat, stream);
+                    var player = new SoundPlayer(_audioEngine, IAudioService.DefaultAudioFormat, provider)
+                    {
+                        Volume = (float)ISpeechService.GlobalSettings.SpeechVolume
+                    };
+
+                    CurrentSoundPlayer = player;
+                    device.MasterMixer.AddComponent(player);
+
+                    var playbackTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                    void PlaybackStoppedHandler(object? sender, EventArgs args)
+                    {
+                        playbackTcs.TrySetResult(true);
+                    }
+
+                    using var cancellationRegistration = playInfo.CancellationTokenSource.Token.Register(() =>
+                    {
+                        try
+                        {
+                            player.Stop();
+                        }
+                        catch
+                        {
+                            // 忽略停止时可能抛出的异常
+                        }
+
+                        playbackTcs.TrySetCanceled(playInfo.CancellationTokenSource.Token);
+                    });
+
+                    try
+                    {
+                        player.PlaybackEnded += PlaybackStoppedHandler;
+                        player.Play();
+
+                        await playbackTcs.Task.WaitAsync(TimeSpan.FromSeconds(30), playInfo.CancellationTokenSource.Token);
+                    }
+                    catch (TimeoutException)
+                    {
+                        _logger.LogWarning("等待语音播放结束超时，强制停止：{FilePath}", playInfo.FilePath);
+                        try
+                        {
+                            player.Stop();
+                        }
+                        catch
+                        {
+                            // 忽略停止时可能抛出的异常
+                        }
+                    }
+                    finally
+                    {
+                        player.PlaybackEnded -= PlaybackStoppedHandler;
+                        player.Dispose();
+                        CurrentSoundPlayer = null;
+                    }
+
+                    _logger.LogDebug("结束播放 {FilePath}", playInfo.FilePath);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogDebug("语音播放已取消：{FilePath}", playInfo.FilePath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "无法播放语音。");
+                }
             }
         }
-
-        CurrentPlayInfo = null;
-        CurrentSoundPlayer = null;
-        IsPlaying = false;
+        finally
+        {
+            CurrentPlayInfo = null;
+            IsPlaying = false;
+        }
     }
 }
 
