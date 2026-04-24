@@ -4,15 +4,20 @@ namespace MiMoTTS.Models;
 
 public class MiMoSpeechSettings : ObservableRecipient
 {
-    private string _apiBaseUrl = "https://api.xiaomimimo.com/v1";
+    public const string DefaultApiBaseUrl = "https://api.xiaomimimo.com/v1";
+    public const string ModelV2 = "mimo-v2-tts";
+    public const string ModelV25 = "mimo-v2.5-tts";
+
+    private string _apiBaseUrl = DefaultApiBaseUrl;
     private string _apiKey = "";
-    private string _model = "mimo-v2-tts";
+    private string _model = ModelV2;
     private string _voice = "mimo_default";
     private string _audioFormat = "wav";
     private string _style = "";
     private string _speedStyle = "默认";
     private bool _enableUserPrompt = true;
     private string _userPrompt = "请自然、清晰地朗读内容。";
+    private bool _enableSingingMode;
 
     public string ApiBaseUrl
     {
@@ -109,6 +114,17 @@ public class MiMoSpeechSettings : ObservableRecipient
         {
             if (value == _userPrompt) return;
             _userPrompt = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool EnableSingingMode
+    {
+        get => _enableSingingMode;
+        set
+        {
+            if (value == _enableSingingMode) return;
+            _enableSingingMode = value;
             OnPropertyChanged();
         }
     }

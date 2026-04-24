@@ -59,7 +59,8 @@ public class MiMoSpeechService : ISpeechService
             return;
         }
 
-        var speechText = BuildSpeechText(text, settings.Style, settings.SpeedStyle);
+        var speechText = BuildSpeechText(text, settings);
+        var userPrompt = BuildUserPrompt(settings);
 
         _logger.LogInformation("使用模型 {Model}、音色 {Voice} 朗读文本：{Text}",
             settings.Model, settings.Voice, speechText);
@@ -73,13 +74,18 @@ public class MiMoSpeechService : ISpeechService
                 RequestingCancellationTokenSource.Token);
         }
 
-        var cachePath = GetCachePath(speechText, settings);
+        var cachePath = GetCachePath(speechText, userPrompt, settings);
         _logger.LogDebug("语音缓存路径：{CachePath}", cachePath);
 
         Task<bool>? downloadTask = null;
         if (!File.Exists(cachePath))
         {
-            downloadTask = GenerateSpeechAsync(speechText, cachePath, settings, RequestingCancellationTokenSource.Token);
+            downloadTask = GenerateSpeechAsync(
+                speechText,
+                userPrompt,
+                cachePath,
+                settings,
+                RequestingCancellationTokenSource.Token);
         }
 
         if (RequestingCancellationTokenSource.IsCancellationRequested)
@@ -115,30 +121,72 @@ public class MiMoSpeechService : ISpeechService
         }
     }
 
-    private string BuildSpeechText(string text, string style, string speedStyle)
+    private static bool IsV25Model(MiMoSpeechSettings settings) =>
+        string.Equals(settings.Model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeModel(string? model) =>
+        string.Equals(model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase)
+            ? MiMoSpeechSettings.ModelV25
+            : MiMoSpeechSettings.ModelV2;
+
+    private string BuildSpeechText(string text, MiMoSpeechSettings settings)
     {
         var styleParts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(style))
+        if (!string.IsNullOrWhiteSpace(settings.Style))
         {
-            styleParts.Add(style.Trim());
+            styleParts.Add(settings.Style.Trim());
         }
 
-        if (!string.IsNullOrWhiteSpace(speedStyle) && speedStyle.Trim() != "默认")
+        if (!string.IsNullOrWhiteSpace(settings.SpeedStyle) && settings.SpeedStyle.Trim() != "默认")
         {
-            styleParts.Add(speedStyle.Trim());
+            styleParts.Add(settings.SpeedStyle.Trim());
         }
 
-        if (styleParts.Count == 0)
+        if (IsV25Model(settings))
         {
-            return text;
+            return BuildV25SpeechText(text, styleParts, settings.EnableSingingMode);
         }
 
-        if (text.TrimStart().StartsWith("<style>", StringComparison.OrdinalIgnoreCase))
+        if (styleParts.Count == 0 || text.TrimStart().StartsWith("<style>", StringComparison.OrdinalIgnoreCase))
         {
             return text;
         }
 
         return $"<style>{string.Join(" ", styleParts)}</style>{text}";
+    }
+
+    private static string BuildV25SpeechText(string text, IReadOnlyCollection<string> styleParts, bool enableSingingMode)
+    {
+        var trimmedText = text.TrimStart();
+        if (trimmedText.StartsWith("(") || trimmedText.StartsWith("（") || trimmedText.StartsWith("["))
+        {
+            return text;
+        }
+
+        var prefixParts = new List<string>();
+        if (enableSingingMode)
+        {
+            prefixParts.Add("唱歌");
+        }
+
+        prefixParts.AddRange(styleParts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part.Trim()));
+
+        if (prefixParts.Count == 0)
+        {
+            return text;
+        }
+
+        return $"({string.Join(" ", prefixParts)}){text}";
+    }
+
+    private static string? BuildUserPrompt(MiMoSpeechSettings settings)
+    {
+        if (!IsV25Model(settings) || !settings.EnableUserPrompt || string.IsNullOrWhiteSpace(settings.UserPrompt))
+        {
+            return null;
+        }
+
+        return settings.UserPrompt.Trim();
     }
 
     private static string EnsureFormatExtension(string format)
@@ -151,9 +199,18 @@ public class MiMoSpeechService : ISpeechService
         return format.Trim().TrimStart('.').ToLowerInvariant();
     }
 
-    private string GetCachePath(string text, MiMoSpeechSettings settings)
+    private string GetCachePath(string text, string? userPrompt, MiMoSpeechSettings settings)
     {
-        var key = $"{settings.Model}|{settings.Voice}|{settings.AudioFormat}|{settings.Style}|{text}";
+        var key = string.Join("|",
+            NormalizeModel(settings.Model),
+            settings.Voice,
+            settings.AudioFormat,
+            settings.Style,
+            settings.SpeedStyle,
+            settings.EnableSingingMode,
+            settings.EnableUserPrompt,
+            userPrompt ?? "",
+            text);
         var md5 = MD5.HashData(Encoding.UTF8.GetBytes(key));
         var md5String = md5.Aggregate("", (current, t) => current + t.ToString("x2"));
         var extension = EnsureFormatExtension(settings.AudioFormat);
@@ -177,6 +234,7 @@ public class MiMoSpeechService : ISpeechService
 
     private async Task<bool> GenerateSpeechAsync(
         string text,
+        string? userPrompt,
         string filePath,
         MiMoSpeechSettings settings,
         CancellationToken cancellationToken)
@@ -184,7 +242,7 @@ public class MiMoSpeechService : ISpeechService
         try
         {
             using var httpClient = CreateHttpClient();
-            var requestUri = $"{settings.ApiBaseUrl.TrimEnd('/')}/chat/completions";
+            var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
 
             using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
             if (!string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -193,12 +251,12 @@ public class MiMoSpeechService : ISpeechService
             }
 
             var messages = new List<MiMoRequestMessage>();
-            if (settings.EnableUserPrompt && !string.IsNullOrWhiteSpace(settings.UserPrompt))
+            if (!string.IsNullOrWhiteSpace(userPrompt))
             {
                 messages.Add(new MiMoRequestMessage
                 {
                     Role = "user",
-                    Content = settings.UserPrompt
+                    Content = userPrompt
                 });
             }
 
@@ -210,7 +268,7 @@ public class MiMoSpeechService : ISpeechService
 
             var requestBody = new MiMoRequestBody
             {
-                Model = settings.Model,
+                Model = NormalizeModel(settings.Model),
                 Messages = messages,
                 Audio = new MiMoRequestAudio
                 {
@@ -418,7 +476,7 @@ public class MiMoPlayInfo
 public class MiMoRequestBody
 {
     [JsonPropertyName("model")]
-    public string Model { get; set; } = "mimo-v2-tts";
+    public string Model { get; set; } = MiMoSpeechSettings.ModelV2;
 
     [JsonPropertyName("messages")]
     public List<MiMoRequestMessage> Messages { get; set; } = [];
