@@ -242,85 +242,15 @@ public class MiMoSpeechService : ISpeechService
         try
         {
             using var httpClient = CreateHttpClient();
-            var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
-            if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+            if (IsV25Model(settings))
             {
-                request.Headers.Add("api-key", settings.ApiKey);
+                return await GenerateSpeechV25Async(httpClient, text, userPrompt, filePath, settings, cancellationToken);
             }
-
-            var messages = new List<MiMoRequestMessage>();
-            if (!string.IsNullOrWhiteSpace(userPrompt))
+            else
             {
-                messages.Add(new MiMoRequestMessage
-                {
-                    Role = "user",
-                    Content = userPrompt
-                });
+                return await GenerateSpeechV2Async(httpClient, text, filePath, settings, cancellationToken);
             }
-
-            messages.Add(new MiMoRequestMessage
-            {
-                Role = "assistant",
-                Content = text
-            });
-
-            var requestBody = new MiMoRequestBody
-            {
-                Model = NormalizeModel(settings.Model),
-                Messages = messages,
-                Audio = new MiMoRequestAudio
-                {
-                    Format = EnsureFormatExtension(settings.AudioFormat),
-                    Voice = settings.Voice
-                }
-            };
-
-            request.Content = new StringContent(
-                JsonSerializer.Serialize(requestBody),
-                Encoding.UTF8,
-                "application/json");
-
-            _logger.LogDebug("发送 MiMo TTS 请求到：{RequestUri}", requestUri);
-
-            using var response = await httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
-            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("MiMo TTS 请求失败，状态码：{StatusCode}, 内容：{ErrorContent}",
-                    response.StatusCode,
-                    responseContent);
-                return false;
-            }
-
-            var result = JsonSerializer.Deserialize<MiMoResponseBody>(responseContent);
-            var audioBase64 = result?.Choices?.FirstOrDefault()?.Message?.Audio?.Data;
-
-            if (string.IsNullOrWhiteSpace(audioBase64))
-            {
-                _logger.LogError("MiMo TTS 响应中未找到音频数据：{ResponseContent}", responseContent);
-                return false;
-            }
-
-            byte[] audioBytes;
-            try
-            {
-                audioBytes = Convert.FromBase64String(audioBase64);
-            }
-            catch (FormatException ex)
-            {
-                _logger.LogError(ex, "MiMo TTS 响应中的音频数据不是合法 Base64。");
-                return false;
-            }
-
-            await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
-            _logger.LogDebug("语音生成并保存到：{FilePath}", filePath);
-            return true;
         }
         catch (OperationCanceledException)
         {
@@ -332,6 +262,152 @@ public class MiMoSpeechService : ISpeechService
             _logger.LogError(ex, "发送 MiMo TTS 请求时发生异常。");
             return false;
         }
+    }
+
+    /// <summary>
+    /// v2-tts: 使用 /audio/speech 端点，OpenAI TTS 兼容格式
+    /// </summary>
+    private async Task<bool> GenerateSpeechV2Async(
+        HttpClient httpClient,
+        string text,
+        string filePath,
+        MiMoSpeechSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/audio/speech";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+        if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
+        }
+
+        var requestBody = new MiMoV2RequestBody
+        {
+            Input = text,
+            Model = NormalizeModel(settings.Model),
+            Voice = settings.Voice,
+            ResponseFormat = EnsureFormatExtension(settings.AudioFormat)
+        };
+
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody),
+            Encoding.UTF8,
+            "application/json");
+
+        _logger.LogDebug("发送 MiMo v2-tts 请求到：{RequestUri}", requestUri);
+
+        using var response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogError("MiMo v2-tts 请求失败，状态码：{StatusCode}, 内容：{ErrorContent}",
+                response.StatusCode, errorContent);
+            return false;
+        }
+
+        // v2-tts 直接返回音频流
+        await using var audioStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var fileStream = File.Create(filePath);
+        await audioStream.CopyToAsync(fileStream, cancellationToken);
+
+        _logger.LogDebug("语音生成并保存到：{FilePath}", filePath);
+        return true;
+    }
+
+    /// <summary>
+    /// v2.5-tts: 使用 /chat/completions 端点，messages 格式，返回 Base64 音频
+    /// </summary>
+    private async Task<bool> GenerateSpeechV25Async(
+        HttpClient httpClient,
+        string text,
+        string? userPrompt,
+        string filePath,
+        MiMoSpeechSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+        if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            request.Headers.Add("api-key", settings.ApiKey);
+        }
+
+        var messages = new List<MiMoRequestMessage>();
+        if (!string.IsNullOrWhiteSpace(userPrompt))
+        {
+            messages.Add(new MiMoRequestMessage
+            {
+                Role = "user",
+                Content = userPrompt
+            });
+        }
+
+        messages.Add(new MiMoRequestMessage
+        {
+            Role = "assistant",
+            Content = text
+        });
+
+        var requestBody = new MiMoRequestBody
+        {
+            Model = NormalizeModel(settings.Model),
+            Messages = messages,
+            Audio = new MiMoRequestAudio
+            {
+                Format = EnsureFormatExtension(settings.AudioFormat),
+                Voice = settings.Voice
+            }
+        };
+
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody),
+            Encoding.UTF8,
+            "application/json");
+
+        _logger.LogDebug("发送 MiMo v2.5-tts 请求到：{RequestUri}", requestUri);
+
+        using var response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("MiMo v2.5-tts 请求失败，状态码：{StatusCode}, 内容：{ErrorContent}",
+                response.StatusCode, responseContent);
+            return false;
+        }
+
+        var result = JsonSerializer.Deserialize<MiMoResponseBody>(responseContent);
+        var audioBase64 = result?.Choices?.FirstOrDefault()?.Message?.Audio?.Data;
+
+        if (string.IsNullOrWhiteSpace(audioBase64))
+        {
+            _logger.LogError("MiMo v2.5-tts 响应中未找到音频数据：{ResponseContent}", responseContent);
+            return false;
+        }
+
+        byte[] audioBytes;
+        try
+        {
+            audioBytes = Convert.FromBase64String(audioBase64);
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "MiMo v2.5-tts 响应中的音频数据不是合法 Base64。");
+            return false;
+        }
+
+        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
+        _logger.LogDebug("语音生成并保存到：{FilePath}", filePath);
+        return true;
     }
 
     private async Task ProcessPlayerList()
@@ -483,6 +559,24 @@ public class MiMoRequestBody
 
     [JsonPropertyName("audio")]
     public MiMoRequestAudio Audio { get; set; } = new();
+}
+
+/// <summary>
+/// v2-tts 请求体（OpenAI TTS 兼容格式）
+/// </summary>
+public class MiMoV2RequestBody
+{
+    [JsonPropertyName("input")]
+    public string Input { get; set; } = "";
+
+    [JsonPropertyName("model")]
+    public string Model { get; set; } = MiMoSpeechSettings.ModelV2;
+
+    [JsonPropertyName("voice")]
+    public string Voice { get; set; } = "mimo_default";
+
+    [JsonPropertyName("response_format")]
+    public string ResponseFormat { get; set; } = "wav";
 }
 
 public class MiMoRequestMessage
