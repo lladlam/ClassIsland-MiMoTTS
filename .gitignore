@@ -1,3 +1,16 @@
-MimoTTS/bin/
-MimoTTS/cipx/
-MimoTTS/obj/
+## Build output
+**/bin/
+**/obj/
+**/cipx/
+
+## IDE / Editor
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+.idea/
+
+## OS
+.DS_Store
+Thumbs.db
