@@ -274,7 +274,7 @@ public class MiMoSpeechService : ISpeechService
         MiMoSpeechSettings settings,
         CancellationToken cancellationToken)
     {
-        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/audio/speech";
+        var requestUri = $"{settings.ApiBaseUrl}/audio/speech";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         if (!string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -330,7 +330,7 @@ public class MiMoSpeechService : ISpeechService
         MiMoSpeechSettings settings,
         CancellationToken cancellationToken)
     {
-        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
+        var requestUri = $"{settings.ApiBaseUrl}/chat/completions";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         if (!string.IsNullOrWhiteSpace(settings.ApiKey))
