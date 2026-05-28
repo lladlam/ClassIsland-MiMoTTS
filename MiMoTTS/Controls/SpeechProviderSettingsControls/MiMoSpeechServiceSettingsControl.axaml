@@ -10,9 +10,11 @@
                               d:DesignHeight="450"
                               d:DesignWidth="800">
     <StackPanel DataContext="{Binding}" Spacing="1">
-        <controls:SettingsExpanderItem Content="API 地址" Description="已内嵌为官方地址，不再允许手动修改。">
+        <controls:SettingsExpanderItem Content="API 地址">
             <controls:SettingsExpanderItem.Footer>
-                <TextBlock Width="280" VerticalAlignment="Center" Text="{Binding FixedApiBaseUrl}"/>
+                <ComboBox Width="280"
+                          ItemsSource="{Binding ApiBaseUrlOptions}"
+                          SelectedItem="{Binding Settings.ApiBaseUrl, Mode=TwoWay}"/>
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 

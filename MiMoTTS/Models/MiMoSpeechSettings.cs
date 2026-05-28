@@ -5,6 +5,7 @@ namespace MiMoTTS.Models;
 public class MiMoSpeechSettings : ObservableRecipient
 {
     public const string DefaultApiBaseUrl = "https://api.xiaomimimo.com/v1";
+    public const string TokenPlanApiBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1";
     public const string ModelV2 = "mimo-v2-tts";
     public const string ModelV25 = "mimo-v2.5-tts";
 

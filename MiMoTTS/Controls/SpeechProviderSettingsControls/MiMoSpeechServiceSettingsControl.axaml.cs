@@ -17,6 +17,11 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
         MiMoSpeechSettings.ModelV2,
         MiMoSpeechSettings.ModelV25
     ];
+    public IReadOnlyList<string> ApiBaseUrlOptions { get; } =
+    [
+        MiMoSpeechSettings.DefaultApiBaseUrl,
+        MiMoSpeechSettings.TokenPlanApiBaseUrl
+    ];
     public IReadOnlyList<string> SpeedStyleOptions { get; } =
     [
         "默认",
@@ -24,7 +29,6 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
         "变慢"
     ];
 
-    public string FixedApiBaseUrl => MiMoSpeechSettings.DefaultApiBaseUrl;
     public bool IsV25Model =>
         string.Equals(Settings.Model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase);
 
@@ -41,7 +45,9 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
 
         Settings.PropertyChanged += SettingsOnPropertyChanged;
 
-        if (Settings.ApiBaseUrl != MiMoSpeechSettings.DefaultApiBaseUrl)
+        if (string.IsNullOrWhiteSpace(Settings.ApiBaseUrl) ||
+            (Settings.ApiBaseUrl != MiMoSpeechSettings.DefaultApiBaseUrl &&
+             Settings.ApiBaseUrl != MiMoSpeechSettings.TokenPlanApiBaseUrl))
         {
             Settings.ApiBaseUrl = MiMoSpeechSettings.DefaultApiBaseUrl;
         }
