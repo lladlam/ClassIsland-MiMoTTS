@@ -1,10 +1,9 @@
 name: Build and Auto Release
 
-# 触发条件：只有在本地打标签并推送到 GitHub 时才会触发（例如：v1.0.0）
 on:
   push:
     tags:
-      - '[0-9]*'
+      - '[0-9]*' # 匹配所有纯数字版本号标签
 
 jobs:
   build:
@@ -25,22 +24,23 @@ jobs:
     - name: Publish and Create CIPX
       run: dotnet publish -c Release -p:CreateCipx=true
 
-    # 2. 使用 PowerShell 计算 CIPX 文件的 MD5 校验和
+    # 2. 修正路径：使用 PowerShell 去 SDK 生成的 cipx 目录下计算 MD5
     - name: Calculate MD5
       id: calc_md5
       shell: pwsh
       run: |
-        $file = Get-ChildItem -Path "**/bin/Release/net8.0-windows/publish/*.cipx", "**/bin/Release/net8.0-windows/*.cipx" | Select-Object -First 1
+        $file = Get-ChildItem -Path "**/cipx/*.cipx" | Select-Object -First 1
         if ($file) {
             $md5 = (Get-FileHash $file.FullName -Algorithm MD5).Hash.ToLower()
             "FILE_MD5=$md5" | Out-File -FilePath $env:GITHUB_ENV -Append
             "FILE_NAME=$($file.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "FILE_PATH=$($file.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
         } else {
             Write-Error "未找到打包生成的 .cipx 文件"
             exit 1
         }
 
-    # 3. 创建 GitHub Release 并上传产物
+    # 3. 创建 Release，同时上传产物，并在内容里带上 MD5 和自动生成的更新日志
     - name: Create Release and Upload Asset
       uses: softprops/action-gh-release@v2
       with:
@@ -48,8 +48,8 @@ jobs:
         name: ${{ github.ref_name }}
         draft: false
         prerelease: false
-        generate_release_notes: true  # 自动生成更新日志
-        append_body: true             # 将 MD5 附加在更新日志前面
+        generate_release_notes: true  # 自动生成更新日志并拼在后面
+        append_body: true             # 确保 MD5 和日志同时存在
         body: |
           ### 📦 产物校验信息
           - **文件名**: ${{ env.FILE_NAME }}
@@ -58,5 +58,4 @@ jobs:
           ---
           ### 📝 更新日志
         files: |
-          **/bin/Release/net8.0-windows/publish/*.cipx
-          **/bin/Release/net8.0-windows/*.cipx
+          ${{ env.FILE_PATH }}
