@@ -45,7 +45,7 @@
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
-        <controls:SettingsExpanderItem Content="风格标签" Description="v2 会注入 &lt;style&gt;，v2.5 会转换为开头的括号风格标签。">
+        <controls:SettingsExpanderItem Content="风格标签" Description="v2 使用 &lt;style&gt; 标签，v2.5 使用括号风格标签。">
             <controls:SettingsExpanderItem.Footer>
                 <TextBox Width="220" Text="{Binding Settings.Style, Mode=TwoWay}"/>
             </controls:SettingsExpanderItem.Footer>
@@ -59,24 +59,21 @@
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
-        <controls:SettingsExpanderItem IsVisible="{Binding IsV25Model}"
-                                       Content="唱歌模式"
-                                       Description="仅 mimo-v2.5-tts 支持，会在文本最前面自动添加 (唱歌) 标签。">
+        <controls:SettingsExpanderItem Content="唱歌模式"
+                                       Description="会在文本最前面自动添加唱歌风格标签。">
             <controls:SettingsExpanderItem.Footer>
                 <CheckBox IsChecked="{Binding Settings.EnableSingingMode, Mode=TwoWay}"/>
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
-        <controls:SettingsExpanderItem IsVisible="{Binding IsV25Model}"
-                                       Content="启用自然语言控制"
-                                       Description="仅 mimo-v2.5-tts 支持，会把提示词作为 user 角色消息发送。">
+        <controls:SettingsExpanderItem Content="启用自然语言控制"
+                                       Description="会把提示词作为 user 角色消息发送，可选但建议携带。">
             <controls:SettingsExpanderItem.Footer>
                 <CheckBox IsChecked="{Binding Settings.EnableUserPrompt, Mode=TwoWay}"/>
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
-        <controls:SettingsExpanderItem IsVisible="{Binding IsV25Model}"
-                                       Content="自然语言控制提示词"
+        <controls:SettingsExpanderItem Content="自然语言控制提示词"
                                        Description="用于控制语气、情绪、节奏等；不会直接出现在合成语音中。">
             <controls:SettingsExpanderItem.Footer>
                 <TextBox Width="360"
