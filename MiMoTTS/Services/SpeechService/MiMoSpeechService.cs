@@ -122,12 +122,20 @@ public class MiMoSpeechService : ISpeechService
     }
 
     private static bool IsV25Model(MiMoSpeechSettings settings) =>
-        string.Equals(settings.Model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase);
+        string.Equals(settings.Model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(settings.Model, MiMoSpeechSettings.ModelV25VoiceClone, StringComparison.OrdinalIgnoreCase);
 
-    private static string NormalizeModel(string? model) =>
-        string.Equals(model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase)
-            ? MiMoSpeechSettings.ModelV25
-            : MiMoSpeechSettings.ModelV2;
+    private static bool IsVoiceCloneModel(MiMoSpeechSettings settings) =>
+        string.Equals(settings.Model, MiMoSpeechSettings.ModelV25VoiceClone, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeModel(string? model)
+    {
+        if (string.Equals(model, MiMoSpeechSettings.ModelV25VoiceClone, StringComparison.OrdinalIgnoreCase))
+            return MiMoSpeechSettings.ModelV25VoiceClone;
+        if (string.Equals(model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase))
+            return MiMoSpeechSettings.ModelV25;
+        return MiMoSpeechSettings.ModelV2;
+    }
 
     private string BuildSpeechText(string text, MiMoSpeechSettings settings)
     {
@@ -206,9 +214,24 @@ public class MiMoSpeechService : ISpeechService
 
     private string GetCachePath(string text, string? userPrompt, MiMoSpeechSettings settings)
     {
+        var voiceCloneAudioHash = "";
+        if (IsVoiceCloneModel(settings) && !string.IsNullOrWhiteSpace(settings.VoiceCloneAudioPath) && File.Exists(settings.VoiceCloneAudioPath))
+        {
+            try
+            {
+                var audioBytes = File.ReadAllBytes(settings.VoiceCloneAudioPath);
+                var hashBytes = MD5.HashData(audioBytes);
+                voiceCloneAudioHash = hashBytes.Aggregate("", (current, t) => current + t.ToString("x2"));
+            }
+            catch
+            {
+                voiceCloneAudioHash = settings.VoiceCloneAudioPath;
+            }
+        }
+
         var key = string.Join("|",
             NormalizeModel(settings.Model),
-            settings.Voice,
+            IsVoiceCloneModel(settings) ? voiceCloneAudioHash : settings.Voice,
             settings.AudioFormat,
             settings.Style,
             settings.SpeedStyle,
@@ -219,7 +242,8 @@ public class MiMoSpeechService : ISpeechService
         var md5 = MD5.HashData(Encoding.UTF8.GetBytes(key));
         var md5String = md5.Aggregate("", (current, t) => current + t.ToString("x2"));
         var extension = EnsureFormatExtension(settings.AudioFormat);
-        var path = Path.Combine(MiMoCacheFolderPath, settings.Voice, $"{md5String}.{extension}");
+        var cacheFolder = IsVoiceCloneModel(settings) ? "VoiceClone" : settings.Voice;
+        var path = Path.Combine(MiMoCacheFolderPath, cacheFolder, $"{md5String}.{extension}");
         var directory = Path.GetDirectoryName(path);
         if (!Directory.Exists(directory) && directory != null)
         {
@@ -248,7 +272,11 @@ public class MiMoSpeechService : ISpeechService
         {
             using var httpClient = CreateHttpClient();
 
-            if (IsV25Model(settings))
+            if (IsVoiceCloneModel(settings))
+            {
+                return await GenerateSpeechVoiceCloneAsync(httpClient, text, userPrompt, filePath, settings, cancellationToken);
+            }
+            else if (IsV25Model(settings))
             {
                 return await GenerateSpeechV25Async(httpClient, text, userPrompt, filePath, settings, cancellationToken);
             }
@@ -357,6 +385,131 @@ public class MiMoSpeechService : ISpeechService
 
         await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
         _logger.LogDebug("语音生成并保存到：{FilePath}", filePath);
+        return true;
+    }
+
+    /// <summary>
+    /// v2.5-tts-voiceclone: 使用 /chat/completions 端点，传入音频样本进行音色克隆
+    /// </summary>
+    private async Task<bool> GenerateSpeechVoiceCloneAsync(
+        HttpClient httpClient,
+        string text,
+        string? userPrompt,
+        string filePath,
+        MiMoSpeechSettings settings,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(settings.VoiceCloneAudioPath) || !File.Exists(settings.VoiceCloneAudioPath))
+        {
+            _logger.LogError("音色克隆音频文件路径无效或文件不存在：{Path}", settings.VoiceCloneAudioPath);
+            return false;
+        }
+
+        byte[] audioSampleBytes;
+        try
+        {
+            audioSampleBytes = await File.ReadAllBytesAsync(settings.VoiceCloneAudioPath, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "读取音色克隆音频文件失败：{Path}", settings.VoiceCloneAudioPath);
+            return false;
+        }
+
+        var base64Audio = Convert.ToBase64String(audioSampleBytes);
+        var base64SizeInBytes = Encoding.UTF8.GetByteCount(base64Audio);
+        if (base64SizeInBytes > 10 * 1024 * 1024)
+        {
+            _logger.LogError("音色克隆音频文件 Base64 编码后超过 10MB 限制，当前大小：{Size} 字节", base64SizeInBytes);
+            return false;
+        }
+
+        var extension = Path.GetExtension(settings.VoiceCloneAudioPath).ToLowerInvariant();
+        var mimeType = extension switch
+        {
+            ".mp3" => "audio/mpeg",
+            ".wav" => "audio/wav",
+            _ => "audio/wav"
+        };
+        var voiceData = $"data:{mimeType};base64,{base64Audio}";
+
+        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+        if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            request.Headers.Add("api-key", settings.ApiKey);
+        }
+
+        var messages = new List<MiMoRequestMessage>();
+        if (!string.IsNullOrWhiteSpace(userPrompt))
+        {
+            messages.Add(new MiMoRequestMessage
+            {
+                Role = "user",
+                Content = userPrompt
+            });
+        }
+
+        messages.Add(new MiMoRequestMessage
+        {
+            Role = "assistant",
+            Content = text
+        });
+
+        var requestBody = new MiMoRequestBody
+        {
+            Model = MiMoSpeechSettings.ModelV25VoiceClone,
+            Messages = messages,
+            Audio = new MiMoRequestAudio
+            {
+                Format = EnsureFormatExtension(settings.AudioFormat),
+                Voice = voiceData
+            }
+        };
+
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody),
+            Encoding.UTF8,
+            "application/json");
+
+        _logger.LogDebug("发送 MiMo v2.5-tts-voiceclone 请求到：{RequestUri}", requestUri);
+
+        using var response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("MiMo v2.5-tts-voiceclone 请求失败，状态码：{StatusCode}, 内容：{ErrorContent}",
+                response.StatusCode, responseContent);
+            return false;
+        }
+
+        var result = JsonSerializer.Deserialize<MiMoResponseBody>(responseContent);
+        var audioBase64 = result?.Choices?.FirstOrDefault()?.Message?.Audio?.Data;
+
+        if (string.IsNullOrWhiteSpace(audioBase64))
+        {
+            _logger.LogError("MiMo v2.5-tts-voiceclone 响应中未找到音频数据：{ResponseContent}", responseContent);
+            return false;
+        }
+
+        byte[] audioBytes;
+        try
+        {
+            audioBytes = Convert.FromBase64String(audioBase64);
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "MiMo v2.5-tts-voiceclone 响应中的音频数据不是合法 Base64。");
+            return false;
+        }
+
+        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
+        _logger.LogDebug("音色克隆语音生成并保存到：{FilePath}", filePath);
         return true;
     }
 

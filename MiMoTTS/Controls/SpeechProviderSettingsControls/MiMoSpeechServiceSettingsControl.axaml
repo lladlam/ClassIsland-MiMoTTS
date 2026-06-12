@@ -27,17 +27,33 @@
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
-        <controls:SettingsExpanderItem Content="模型" Description="目前仅支持 mimo-v2-tts 与 mimo-v2.5-tts">
+        <controls:SettingsExpanderItem Content="模型" Description="目前支持 mimo-v2-tts、mimo-v2.5-tts 与 mimo-v2.5-tts-voiceclone">
             <controls:SettingsExpanderItem.Footer>
-                <ComboBox Width="180"
+                <ComboBox Width="220"
                           ItemsSource="{Binding ModelOptions}"
-                          SelectedItem="{Binding Settings.Model, Mode=TwoWay}"/>
+                          SelectedItem="{Binding Settings.Model, Mode=TwoWay}"
+                          SelectionChanged="ModelSelectionChanged"/>
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
-        <controls:SettingsExpanderItem Content="音色" Description="例如：mimo_default / default_zh / default_en">
+        <controls:SettingsExpanderItem Content="音色" Description="例如：mimo_default / default_zh / default_en"
+                                       IsVisible="{Binding !IsVoiceCloneModel}">
             <controls:SettingsExpanderItem.Footer>
                 <TextBox Width="180" Text="{Binding Settings.Voice, Mode=TwoWay}"/>
+            </controls:SettingsExpanderItem.Footer>
+        </controls:SettingsExpanderItem>
+
+        <controls:SettingsExpanderItem Content="音色克隆音频样本"
+                                       Description="选择 mp3 或 wav 格式的音频文件（Base64 不超过 10MB）"
+                                       IsVisible="{Binding IsVoiceCloneModel}">
+            <controls:SettingsExpanderItem.Footer>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBox Width="240"
+                             IsReadOnly="True"
+                             Text="{Binding Settings.VoiceCloneAudioPath, Mode=TwoWay}"/>
+                    <Button Content="浏览..."
+                            Click="BrowseAudioFile_Click"/>
+                </StackPanel>
             </controls:SettingsExpanderItem.Footer>
         </controls:SettingsExpanderItem>
 
@@ -62,7 +78,8 @@
         </controls:SettingsExpanderItem>
 
         <controls:SettingsExpanderItem Content="唱歌模式"
-                                       Description="会在文本最前面自动添加唱歌风格标签。">
+                                       Description="会在文本最前面自动添加唱歌风格标签。（音色克隆模式不支持）"
+                                       IsVisible="{Binding !IsVoiceCloneModel}">
             <controls:SettingsExpanderItem.Footer>
                 <CheckBox IsChecked="{Binding Settings.EnableSingingMode, Mode=TwoWay}"/>
             </controls:SettingsExpanderItem.Footer>

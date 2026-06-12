@@ -8,6 +8,7 @@ public class MiMoSpeechSettings : ObservableRecipient
     public const string TokenPlanApiBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1";
     public const string ModelV2 = "mimo-v2-tts";
     public const string ModelV25 = "mimo-v2.5-tts";
+    public const string ModelV25VoiceClone = "mimo-v2.5-tts-voiceclone";
 
     private string _apiBaseUrl = DefaultApiBaseUrl;
     private string _apiKey = "";
@@ -19,6 +20,7 @@ public class MiMoSpeechSettings : ObservableRecipient
     private bool _enableUserPrompt = true;
     private string _userPrompt = "请自然、清晰地朗读内容。";
     private bool _enableSingingMode;
+    private string _voiceCloneAudioPath = "";
 
     public string ApiBaseUrl
     {
@@ -126,6 +128,17 @@ public class MiMoSpeechSettings : ObservableRecipient
         {
             if (value == _enableSingingMode) return;
             _enableSingingMode = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string VoiceCloneAudioPath
+    {
+        get => _voiceCloneAudioPath;
+        set
+        {
+            if (value == _voiceCloneAudioPath) return;
+            _voiceCloneAudioPath = value;
             OnPropertyChanged();
         }
     }

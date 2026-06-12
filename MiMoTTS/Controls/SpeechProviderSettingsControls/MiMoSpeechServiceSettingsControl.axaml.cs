@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using ClassIsland.Core.Abstractions.Controls;
 using ClassIsland.Shared.Helpers;
 using MiMoTTS.Models;
@@ -15,7 +17,8 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
     public IReadOnlyList<string> ModelOptions { get; } =
     [
         MiMoSpeechSettings.ModelV2,
-        MiMoSpeechSettings.ModelV25
+        MiMoSpeechSettings.ModelV25,
+        MiMoSpeechSettings.ModelV25VoiceClone
     ];
     public IReadOnlyList<string> ApiBaseUrlOptions { get; } =
     [
@@ -30,7 +33,11 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
     ];
 
     public bool IsV25Model =>
-        string.Equals(Settings.Model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase);
+        string.Equals(Settings.Model, MiMoSpeechSettings.ModelV25, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Settings.Model, MiMoSpeechSettings.ModelV25VoiceClone, StringComparison.OrdinalIgnoreCase);
+
+    public bool IsVoiceCloneModel =>
+        string.Equals(Settings.Model, MiMoSpeechSettings.ModelV25VoiceClone, StringComparison.OrdinalIgnoreCase);
 
     public MiMoSpeechServiceSettingsControl()
     {
@@ -53,7 +60,9 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
         }
 
         if (string.IsNullOrWhiteSpace(Settings.Model) ||
-            (Settings.Model != MiMoSpeechSettings.ModelV2 && Settings.Model != MiMoSpeechSettings.ModelV25))
+            (Settings.Model != MiMoSpeechSettings.ModelV2 &&
+             Settings.Model != MiMoSpeechSettings.ModelV25 &&
+             Settings.Model != MiMoSpeechSettings.ModelV25VoiceClone))
         {
             Settings.Model = MiMoSpeechSettings.ModelV2;
         }
@@ -71,6 +80,7 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
         if (args.PropertyName == nameof(MiMoSpeechSettings.Model))
         {
             OnPropertyChanged(nameof(IsV25Model));
+            OnPropertyChanged(nameof(IsVoiceCloneModel));
         }
 
         ConfigureFileHelper.SaveConfig(
@@ -83,6 +93,37 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
         {
             Settings.ApiKey = textBox.Text ?? "";
         }
+    }
+
+    private async void BrowseAudioFile_Click(object? sender, RoutedEventArgs e)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "选择音色克隆音频样本",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("音频文件")
+                {
+                    Patterns = new[] { "*.mp3", "*.wav" }
+                }
+            }
+        });
+
+        if (files.Count > 0)
+        {
+            var filePath = files[0].Path.LocalPath;
+            Settings.VoiceCloneAudioPath = filePath;
+        }
+    }
+
+    private void ModelSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(IsVoiceCloneModel));
+        OnPropertyChanged(nameof(IsV25Model));
     }
 
     public new event PropertyChangedEventHandler? PropertyChanged;
