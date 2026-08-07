@@ -9,4 +9,5 @@ author: lladlam
 repoOwner: lladlam
 repoName: ClassIsland-MiMoTTS
 assetsRoot: main/MiMoTTS
-icon: icon.ico
+artifactName: MiMoTTS.cipx
+icon: Icon.ico

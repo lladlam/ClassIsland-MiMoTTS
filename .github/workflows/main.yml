@@ -3,7 +3,7 @@ name: Build and Auto Release
 on:
   push:
     tags:
-      - '[0-9]*' # 匹配所有纯数字版本号标签
+      - '[0-9]*.[0-9]*.[0-9]*.[0-9]*' # 匹配 a.b.c.d 格式版本号标签
 
 jobs:
   build:
@@ -22,25 +22,28 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    # 1. 编译并打包出 cipx 文件
+    # 1. 编译并打包出 cipx 文件（CI 2.x 和 CI 1.x）
     - name: Publish and Create CIPX
-      run: dotnet publish -c Release -p:CreateCipx=true
+      run: |
+        dotnet publish MiMoTTS/MiMoTTS.csproj -c Release -p:CreateCipx=true
+        dotnet publish MiMoTTS.CI1/MiMoTTS.CI1.csproj -c Release -p:CreateCipx=true
 
     # 2. 使用 PowerShell 计算 CIPX 文件的 MD5 校验和
     - name: Calculate MD5
       id: calc_md5
       shell: pwsh
       run: |
-        $file = Get-ChildItem -Path "**/cipx/*.cipx" | Select-Object -First 1
-        if ($file) {
-            $md5 = (Get-FileHash $file.FullName -Algorithm MD5).Hash.ToLower()
-            "FILE_MD5=$md5" | Out-File -FilePath $env:GITHUB_ENV -Append
-            "FILE_NAME=$($file.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append
-            "FILE_PATH=$($file.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-        } else {
+        $files = Get-ChildItem -Path "**/cipx/*.cipx"
+        if ($files.Count -eq 0) {
             Write-Error "未找到打包生成的 .cipx 文件"
             exit 1
         }
+        $fileList = @()
+        foreach ($file in $files) {
+            $md5 = (Get-FileHash $file.FullName -Algorithm MD5).Hash.ToLower()
+            $fileList += "$($file.Name)|$md5|$($file.FullName)"
+        }
+        "CIPX_FILES=$($fileList -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     # 3. 提取最后一次 commit -m 的内容
     - name: Get Commit Message
@@ -62,11 +65,10 @@ jobs:
         generate_release_notes: false # 关闭 GitHub 自带的汇总，避免重复
         body: |
           ### 📦 产物校验信息
-          - **文件名**: ${{ env.FILE_NAME }}
-          - **MD5**: `${{ env.FILE_MD5 }}`
+          ${{ env.CIPX_FILES && format('- {0}', join('\n- ', split(';', env.CIPX_FILES))) || '- 无产物' }}
           
           ---
           ### 📝 更新日志
           - ${{ env.COMMIT_MSG }}
         files: |
-          ${{ env.FILE_PATH }}
+          **/cipx/*.cipx
