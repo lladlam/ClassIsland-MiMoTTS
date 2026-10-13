@@ -10,18 +10,21 @@
                              d:DesignHeight="450" d:DesignWidth="800">
     <ci:SpeechProviderControlBase.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <local:InverseBooleanToVisibilityConverter x:Key="BoolToInverseVisibility"/>
     </ci:SpeechProviderControlBase.Resources>
-    <StackPanel DataContext="{Binding}" Spacing="8">
-        <md:Card Padding="16">
+    <StackPanel DataContext="{Binding}">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
-                <TextBlock Text="API 地址" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock Text="API 地址" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <TextBlock Text="按量付费用官方地址；Token Plan 按地区选择 cn / sgp / ams。"
+                           FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
                 <ComboBox Width="280"
                           ItemsSource="{Binding ApiBaseUrlOptions}"
                           SelectedItem="{Binding Settings.ApiBaseUrl, Mode=TwoWay}"/>
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="API Key" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <PasswordBox Width="280"
@@ -29,7 +32,7 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="模型" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="目前支持 mimo-v2-tts、mimo-v2.5-tts 与 mimo-v2.5-tts-voiceclone"
@@ -41,7 +44,7 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16" Visibility="{Binding IsVoiceCloneModel, Converter={StaticResource BoolToVisibility}, ConverterInverse=True}">
+        <md:Card Padding="16" Margin="0,0,0,8" Visibility="{Binding IsVoiceCloneModel, Converter={StaticResource BoolToInverseVisibility}}">
             <StackPanel>
                 <TextBlock Text="音色" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="例如：mimo_default / default_zh / default_en"
@@ -50,29 +53,30 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16" Visibility="{Binding IsVoiceCloneModel, Converter={StaticResource BoolToVisibility}}">
+        <md:Card Padding="16" Margin="0,0,0,8" Visibility="{Binding IsVoiceCloneModel, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
                 <TextBlock Text="音色克隆音频样本" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="选择 mp3 或 wav 格式的音频文件（Base64 不超过 10MB）"
                            FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                <StackPanel Orientation="Horizontal" Spacing="4">
+                <StackPanel Orientation="Horizontal">
                     <TextBox Width="240"
                              IsReadOnly="True"
                              Text="{Binding Settings.VoiceCloneAudioPath, Mode=TwoWay}"/>
                     <Button Content="浏览..."
+                            Margin="4,0,0,0"
                             Click="BrowseAudioFile_Click"/>
                 </StackPanel>
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="音频格式" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <TextBox Width="120" Text="{Binding Settings.AudioFormat, Mode=TwoWay}"/>
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="风格标签" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="v2 使用 &lt;style&gt; 标签，v2.5 使用括号风格标签。"
@@ -81,7 +85,7 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="语速" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="会和风格标签一起参与文本前缀生成。"
@@ -92,7 +96,7 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16" Visibility="{Binding IsVoiceCloneModel, Converter={StaticResource BoolToVisibility}, ConverterInverse=True}">
+        <md:Card Padding="16" Margin="0,0,0,8" Visibility="{Binding IsVoiceCloneModel, Converter={StaticResource BoolToInverseVisibility}}">
             <StackPanel>
                 <TextBlock Text="唱歌模式" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="会在文本最前面自动添加唱歌风格标签。（音色克隆模式不支持）"
@@ -101,7 +105,7 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="启用自然语言控制" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="会把提示词作为 user 角色消息发送，可选但建议携带。"
@@ -110,7 +114,7 @@
             </StackPanel>
         </md:Card>
 
-        <md:Card Padding="16">
+        <md:Card Padding="16" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="自然语言控制提示词" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock Text="用于控制语气、情绪、节奏等；不会直接出现在合成语音中。"

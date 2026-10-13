@@ -6,6 +6,8 @@ using ClassIsland.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using MiMoTTS.CI1.Models;
 using MiMoTTS.CI1.Shared;
+using NAudio.Wave;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -20,7 +22,6 @@ public class MiMoSpeechService : ISpeechService
     public static readonly string MiMoCacheFolderPath = Path.Combine(GlobalConstants.PluginConfigFolder, "MiMoCache");
 
     private readonly ILogger<MiMoSpeechService> _logger;
-    private readonly IAudioService _audioService;
 
     private MiMoSpeechSettings _settings = new();
     private Queue<MiMoPlayInfo> PlayingQueue { get; } = new();
@@ -28,10 +29,9 @@ public class MiMoSpeechService : ISpeechService
     private CancellationTokenSource? RequestingCancellationTokenSource { get; set; }
     private MiMoPlayInfo? CurrentPlayInfo { get; set; }
 
-    public MiMoSpeechService(ILogger<MiMoSpeechService> logger, IAudioService audioService)
+    public MiMoSpeechService(ILogger<MiMoSpeechService> logger)
     {
         _logger = logger;
-        _audioService = audioService;
         ReloadConfig();
         _logger.LogInformation("初始化了 MiMo TTS 服务。");
     }
@@ -286,7 +286,7 @@ public class MiMoSpeechService : ISpeechService
         MiMoSpeechSettings settings,
         CancellationToken cancellationToken)
     {
-        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
+        var requestUri = $"{MiMoSpeechSettings.NormalizeApiBaseUrl(settings.ApiBaseUrl)}/chat/completions";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         if (!string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -408,7 +408,7 @@ public class MiMoSpeechService : ISpeechService
         };
         var voiceData = $"data:{mimeType};base64,{base64Audio}";
 
-        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
+        var requestUri = $"{MiMoSpeechSettings.NormalizeApiBaseUrl(settings.ApiBaseUrl)}/chat/completions";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         if (!string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -496,7 +496,7 @@ public class MiMoSpeechService : ISpeechService
         MiMoSpeechSettings settings,
         CancellationToken cancellationToken)
     {
-        var requestUri = $"{MiMoSpeechSettings.DefaultApiBaseUrl}/chat/completions";
+        var requestUri = $"{MiMoSpeechSettings.NormalizeApiBaseUrl(settings.ApiBaseUrl)}/chat/completions";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         if (!string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -617,11 +617,58 @@ public class MiMoSpeechService : ISpeechService
                 {
                     _logger.LogDebug("开始播放 {FilePath}", playInfo.FilePath);
 
-                    using var stream = File.OpenRead(playInfo.FilePath);
-                    await _audioService.PlayAudioAsync(
-                        stream,
-                        (float)ISpeechService.GlobalSettings.SpeechVolume,
-                        playInfo.CancellationTokenSource.Token);
+                    var cancellationToken = playInfo.CancellationTokenSource.Token;
+                    using var audioFile = new AudioFileReader(playInfo.FilePath)
+                    {
+                        Volume = (float)ISpeechService.GlobalSettings.SpeechVolume
+                    };
+                    using var wavePlayer = new DirectSoundOut();
+                    wavePlayer.Init(audioFile);
+
+                    var playbackTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                    void PlaybackStoppedHandler(object? sender, StoppedEventArgs args)
+                    {
+                        playbackTcs.TrySetResult(true);
+                    }
+
+                    wavePlayer.PlaybackStopped += PlaybackStoppedHandler;
+
+                    using var cancellationRegistration = cancellationToken.Register(() =>
+                    {
+                        try
+                        {
+                            wavePlayer.Stop();
+                        }
+                        catch
+                        {
+                            // 忽略停止时可能抛出的异常
+                        }
+
+                        playbackTcs.TrySetCanceled(cancellationToken);
+                    });
+
+                    try
+                    {
+                        wavePlayer.Play();
+                        await playbackTcs.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+                    }
+                    catch (TimeoutException)
+                    {
+                        _logger.LogWarning("等待语音播放结束超时，强制停止：{FilePath}", playInfo.FilePath);
+                        try
+                        {
+                            wavePlayer.Stop();
+                        }
+                        catch
+                        {
+                            // 忽略停止时可能抛出的异常
+                        }
+                    }
+                    finally
+                    {
+                        wavePlayer.PlaybackStopped -= PlaybackStoppedHandler;
+                    }
 
                     _logger.LogDebug("结束播放 {FilePath}", playInfo.FilePath);
                 }

@@ -10,7 +10,8 @@
                               d:DesignHeight="450"
                               d:DesignWidth="800">
     <StackPanel DataContext="{Binding}" Spacing="1">
-        <controls:SettingsExpanderItem Content="API 地址">
+        <controls:SettingsExpanderItem Content="API 地址"
+                                       Description="按量付费用官方地址；Token Plan 按地区选择 cn / sgp / ams。">
             <controls:SettingsExpanderItem.Footer>
                 <ComboBox Width="280"
                           ItemsSource="{Binding ApiBaseUrlOptions}"

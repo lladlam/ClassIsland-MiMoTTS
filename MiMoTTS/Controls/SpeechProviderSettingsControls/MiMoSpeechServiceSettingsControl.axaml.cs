@@ -20,11 +20,7 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
         MiMoSpeechSettings.ModelV25,
         MiMoSpeechSettings.ModelV25VoiceClone
     ];
-    public IReadOnlyList<string> ApiBaseUrlOptions { get; } =
-    [
-        MiMoSpeechSettings.DefaultApiBaseUrl,
-        MiMoSpeechSettings.TokenPlanApiBaseUrl
-    ];
+    public IReadOnlyList<string> ApiBaseUrlOptions { get; } = MiMoSpeechSettings.ApiBaseUrlOptions;
     public IReadOnlyList<string> SpeedStyleOptions { get; } =
     [
         "默认",
@@ -52,11 +48,10 @@ public partial class MiMoSpeechServiceSettingsControl : SpeechProviderControlBas
 
         Settings.PropertyChanged += SettingsOnPropertyChanged;
 
-        if (string.IsNullOrWhiteSpace(Settings.ApiBaseUrl) ||
-            (Settings.ApiBaseUrl != MiMoSpeechSettings.DefaultApiBaseUrl &&
-             Settings.ApiBaseUrl != MiMoSpeechSettings.TokenPlanApiBaseUrl))
+        var normalizedApiBaseUrl = MiMoSpeechSettings.NormalizeApiBaseUrl(Settings.ApiBaseUrl);
+        if (Settings.ApiBaseUrl != normalizedApiBaseUrl)
         {
-            Settings.ApiBaseUrl = MiMoSpeechSettings.DefaultApiBaseUrl;
+            Settings.ApiBaseUrl = normalizedApiBaseUrl;
         }
 
         if (string.IsNullOrWhiteSpace(Settings.Model) ||

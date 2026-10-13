@@ -5,7 +5,7 @@
 ## 功能
 
 - 在 ClassIsland 中新增 `MiMo TTS` 语音提供方。
-- API 地址固定为官方 `https://api.xiaomimimo.com/v1`。
+- API 地址可选：官方按量付费 `https://api.xiaomimimo.com/v1`，或 Token Plan 地区地址 `https://token-plan-{cn,sgp,ams}.xiaomimimo.com/v1`。
 - 支持选择 `mimo-v2-tts` 或 `mimo-v2.5-tts`。
 - 支持设置 API Key、音色、音频格式。
 - 支持风格标签与语速设置。

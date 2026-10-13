@@ -5,10 +5,37 @@ namespace MiMoTTS.CI1.Models;
 public class MiMoSpeechSettings : ObservableRecipient
 {
     public const string DefaultApiBaseUrl = "https://api.xiaomimimo.com/v1";
-    public const string TokenPlanApiBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1";
+    public const string TokenPlanCnApiBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1";
+    public const string TokenPlanSgpApiBaseUrl = "https://token-plan-sgp.xiaomimimo.com/v1";
+    public const string TokenPlanAmsApiBaseUrl = "https://token-plan-ams.xiaomimimo.com/v1";
     public const string ModelV2 = "mimo-v2-tts";
     public const string ModelV25 = "mimo-v2.5-tts";
     public const string ModelV25VoiceClone = "mimo-v2.5-tts-voiceclone";
+
+    /// <summary>API 地址下拉框可选项：按量付费官方地址 + Token Plan 各地区地址。</summary>
+    public static readonly IReadOnlyList<string> ApiBaseUrlOptions =
+    [
+        DefaultApiBaseUrl,
+        TokenPlanCnApiBaseUrl,
+        TokenPlanSgpApiBaseUrl,
+        TokenPlanAmsApiBaseUrl
+    ];
+
+    /// <summary>
+    /// 规范化 API 地址：去除首尾空白与结尾斜杠；为空或不是合法的 http(s) 地址时回退到官方默认地址。
+    /// </summary>
+    public static string NormalizeApiBaseUrl(string? apiBaseUrl)
+    {
+        var url = apiBaseUrl?.Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(url) ||
+            !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return DefaultApiBaseUrl;
+        }
+
+        return url;
+    }
 
     private string _apiBaseUrl = DefaultApiBaseUrl;
     private string _apiKey = "";
