@@ -67,7 +67,7 @@ jobs:
           $artifactSection = "- 无产物"
         }
         $body = "### 📦 产物校验信息`n$artifactSection`n`n---`n### 📝 更新日志`n- $($env:COMMIT_MSG)"
-        Set-Content -FilePath release-body.md -Value $body -Encoding utf8
+        Set-Content -Path release-body.md -Value $body -Encoding utf8
         Get-Content release-body.md
 
     # 5. 创建 Release 并上传产物（关闭了 GitHub 自身的日志，只用你的 commit 信息）
