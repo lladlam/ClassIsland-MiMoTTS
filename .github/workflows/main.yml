@@ -54,7 +54,23 @@ jobs:
         $msg = git log -1 --pretty=format:"%s"
         "COMMIT_MSG=$msg" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    # 4. 创建 Release 并上传产物（关闭了 GitHub 自身的日志，只用你的 commit 信息）
+    # 4. 拼接 Release 正文（Actions 表达式没有 split 函数，改在 PowerShell 里拼好写入文件）
+    - name: Prepare Release Body
+      shell: pwsh
+      run: |
+        $files = @()
+        if (-not [string]::IsNullOrWhiteSpace($env:CIPX_FILES)) {
+          $files = @($env:CIPX_FILES -split ';')
+        }
+        $artifactSection = ($files | ForEach-Object { "- $_" }) -join "`n"
+        if ([string]::IsNullOrWhiteSpace($artifactSection)) {
+          $artifactSection = "- 无产物"
+        }
+        $body = "### 📦 产物校验信息`n$artifactSection`n`n---`n### 📝 更新日志`n- $($env:COMMIT_MSG)"
+        Set-Content -FilePath release-body.md -Value $body -Encoding utf8
+        Get-Content release-body.md
+
+    # 5. 创建 Release 并上传产物（关闭了 GitHub 自身的日志，只用你的 commit 信息）
     - name: Create Release and Upload Asset
       uses: softprops/action-gh-release@v2
       with:
@@ -63,12 +79,6 @@ jobs:
         draft: false
         prerelease: false
         generate_release_notes: false # 关闭 GitHub 自带的汇总，避免重复
-        body: |
-          ### 📦 产物校验信息
-          ${{ env.CIPX_FILES && format('- {0}', join('\n- ', split(';', env.CIPX_FILES))) || '- 无产物' }}
-          
-          ---
-          ### 📝 更新日志
-          - ${{ env.COMMIT_MSG }}
+        body_path: release-body.md
         files: |
           **/cipx/*.cipx
